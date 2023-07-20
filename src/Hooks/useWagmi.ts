@@ -1,37 +1,71 @@
-import { useAccount, useContractReads } from 'wagmi'
+import { configureChains, createConfig, useNetwork } from 'wagmi'
 
-import { useWagmiContract } from './useContract'
+import { InjectedConnector } from 'wagmi/connectors/injected'
+import { MetaMaskConnector } from 'wagmi/connectors/metaMask'
+import { WalletConnectConnector } from 'wagmi/connectors/walletConnect'
+import { WalletConnectLegacyConnector } from 'wagmi/connectors/walletConnectLegacy'
+import { CoinbaseWalletConnector } from 'wagmi/connectors/coinbaseWallet'
+import { publicProvider } from 'wagmi/providers/public'
+import { jsonRpcProvider } from 'wagmi/providers/jsonRpc'
+import { netChain } from '../config/config'
 
-export const useWagmi = () => {
-  const { address } = useAccount()
-  const wagmiContract = useWagmiContract()
+const NetChain = netChain()
+const wagmiConfig = () => {
 
-  const { data } = useContractReads({
-    contracts: [
-      {
-        ...wagmiContract,
-        functionName: 'getAlive',
-      },
-      {
-        ...wagmiContract,
-        functionName: 'getBoredom',
-      },
-      {
-        ...wagmiContract,
-        functionName: 'getAlive',
-      },
-      {
-        ...wagmiContract,
-        functionName: 'love',
-        args: [address!],
-      },
+  console.log(NetChain);
+
+
+  const { chains, publicClient, webSocketPublicClient } = configureChains(
+    [NetChain],
+    [
+      jsonRpcProvider({
+        rpc: (chain) => ({
+          http: 'https://bsc-testnet.publicnode.com',
+        }),
+      }),
+      publicProvider()
+    ]
+  )
+  const config = createConfig({
+    autoConnect: true,
+    connectors: [
+      new InjectedConnector({
+        chains,
+        options: {
+          name: (detectedName) =>
+            `Injected (${typeof detectedName === 'string'
+              ? detectedName
+              : detectedName.join(', ')
+            })`,
+        },
+      }),
+      new MetaMaskConnector({ chains }),
+      new CoinbaseWalletConnector({
+        chains,
+        options: {
+          appName: 'wagmi',
+        },
+      }),
+      new WalletConnectConnector({
+        chains,
+        options: {
+          projectId: 'd6d2ea10db944ad2af625e140a7a960b',
+        },
+      }),
     ],
+    publicClient,
+    webSocketPublicClient,
   })
 
-  return {
-    getBoredom: data?.[1]?.toString() ?? undefined,
-    getAlive: data?.[2]?.toString() ?? undefined,
-    loved: data?.[3]?.toString() ?? undefined,
-    status: data?.[0]?.toString() ?? undefined,
-  }
+  return { config, chains, publicClient, webSocketPublicClient }
 }
+
+
+export const initWagmi = () => {
+  const { config, chains, publicClient, webSocketPublicClient } = wagmiConfig()
+
+
+  return { config }
+}
+
+
